@@ -85,12 +85,32 @@ func (l *limiter) allow() bool {
 All four take the bucket by value and return a new one; none of them
 mutate anything you pass in.
 
+## Multi-tenant use
+
+For the common case of one limit per API client, tenant, or source IP,
+`KeyedLimiter` manages a bucket per key so you don't have to build your own
+map and mutex around single-bucket `Allow`:
+
+```go
+limiter := ratelimit.NewKeyedLimiter(20, 5) // per key: burst 20, 5/sec
+
+func handle(clientID string) {
+	if !limiter.Allow(clientID, time.Now()) {
+		// reject the request
+	}
+}
+```
+
+Buckets are created lazily on first use and never expire on their own; call
+`limiter.Remove(key)` when a tenant goes away (its key is revoked, its
+session ends) to keep the map from growing without bound.
+
 ## Status
 
-Early skeleton. The token bucket is complete and tested. Not yet covered:
-per-key limiters (e.g. one bucket per API client), a sliding-window
-alternative for callers who don't want burst tolerance, and serialization
-helpers for persisting bucket state between process restarts.
+The token bucket and the keyed multi-tenant limiter are complete and
+tested. Not yet covered: a sliding-window alternative for callers who don't
+want burst tolerance, and serialization helpers for persisting bucket state
+between process restarts.
 
 ## License
 
