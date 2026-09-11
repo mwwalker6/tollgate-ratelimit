@@ -105,12 +105,39 @@ Buckets are created lazily on first use and never expire on their own; call
 `limiter.Remove(key)` when a tenant goes away (its key is revoked, its
 session ends) to keep the map from growing without bound.
 
+## Sliding window
+
+`TokenBucket` lets a caller spend a full burst of `Capacity` requests in a
+single instant, as long as it's been idle long enough to refill. If that
+burst tolerance isn't what you want, `SlidingWindow` counts requests
+against a rolling window instead, blending the previous window's count
+into the current one so the limit is enforced smoothly rather than resetting
+in steps:
+
+```go
+w := ratelimit.NewSlidingWindow(100, time.Minute, time.Now()) // 100/min
+
+func handle() {
+	var ok bool
+	w, ok = w.Allow(time.Now())
+	if !ok {
+		// reject the request
+	}
+}
+```
+
+It's the counter variant of the algorithm, not the log variant: it tracks
+two running totals (previous window, current window) rather than a
+timestamp per request, so its size is fixed no matter how much traffic
+passes through it. The cost is that the smoothing is an approximation - it
+assumes requests were spread evenly through the previous window - rather
+than an exact count of the trailing interval.
+
 ## Status
 
-The token bucket and the keyed multi-tenant limiter are complete and
-tested. Not yet covered: a sliding-window alternative for callers who don't
-want burst tolerance, and serialization helpers for persisting bucket state
-between process restarts.
+The token bucket, the sliding window, and the keyed multi-tenant limiter
+are complete and tested. Not yet covered: serialization helpers for
+persisting bucket state between process restarts.
 
 ## License
 
