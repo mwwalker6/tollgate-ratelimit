@@ -111,3 +111,58 @@ func TestKeyedLimiterConcurrentAccess(t *testing.T) {
 		t.Fatalf("Len() = %d, want %d", l.Len(), len(keys))
 	}
 }
+
+func TestKeyedLimiterSnapshotRestore(t *testing.T) {
+	now := time.Now()
+	l := NewKeyedLimiter(10, 1)
+
+	l.AllowN("tenant-a", now, 6)
+	l.AllowN("tenant-b", now, 3)
+
+	snap := l.Snapshot()
+	if len(snap) != 2 {
+		t.Fatalf("Snapshot len = %d, want 2", len(snap))
+	}
+
+	restored := NewKeyedLimiter(10, 1)
+	restored.Restore(snap)
+
+	if restored.Len() != 2 {
+		t.Fatalf("Len() after Restore = %d, want 2", restored.Len())
+	}
+	// tenant-a has 4 tokens left (10 - 6); a 5-token request should be denied.
+	if restored.AllowN("tenant-a", now, 5) {
+		t.Fatal("tenant-a should not have 5 tokens after restoring a drained snapshot")
+	}
+	if !restored.AllowN("tenant-a", now, 4) {
+		t.Fatal("tenant-a should have exactly 4 tokens left after restoring")
+	}
+}
+
+func TestKeyedLimiterSnapshotIsIndependentCopy(t *testing.T) {
+	now := time.Now()
+	l := NewKeyedLimiter(10, 1)
+	l.Allow("tenant-a", now)
+
+	snap := l.Snapshot()
+	l.AllowN("tenant-a", now, 100) // drive tenant-a's live bucket further down
+
+	if snap["tenant-a"] == l.Snapshot()["tenant-a"] {
+		t.Fatal("mutating the limiter after Snapshot should not affect the earlier snapshot")
+	}
+}
+
+func TestKeyedLimiterRestoreDropsUnlistedKeys(t *testing.T) {
+	now := time.Now()
+	l := NewKeyedLimiter(10, 1)
+	l.Allow("tenant-a", now)
+	l.Allow("tenant-b", now)
+
+	l.Restore(map[string]TokenBucket{
+		"tenant-a": NewTokenBucket(10, 1, now),
+	})
+
+	if l.Len() != 1 {
+		t.Fatalf("Len() after Restore = %d, want 1", l.Len())
+	}
+}

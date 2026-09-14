@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -137,4 +138,54 @@ func TestRetryAfterWhenTokensMissing(t *testing.T) {
 	if d != want {
 		t.Fatalf("RetryAfter = %v, want %v", d, want)
 	}
+}
+
+func TestTokenBucketJSONRoundTrip(t *testing.T) {
+	now := time.Now()
+	b := NewTokenBucket(20, 5, now)
+	b, _ = AllowN(b, now, 7)
+
+	data, err := json.Marshal(b)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var got TokenBucket
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if !got.UpdatedAt.Equal(b.UpdatedAt) {
+		t.Fatalf("UpdatedAt = %v, want %v", got.UpdatedAt, b.UpdatedAt)
+	}
+	got.UpdatedAt = b.UpdatedAt // time.Time round-trips to an equal instant, not an identical value
+	if got != b {
+		t.Fatalf("round-tripped bucket = %+v, want %+v", got, b)
+	}
+}
+
+func TestTokenBucketJSONFieldNames(t *testing.T) {
+	b := NewTokenBucket(20, 5, time.Unix(0, 0).UTC())
+
+	data, err := json.Marshal(b)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	for _, field := range []string{"capacity", "refillRate", "tokens", "updatedAt"} {
+		if !json.Valid(data) {
+			t.Fatalf("Marshal produced invalid JSON: %s", data)
+		}
+		if !containsKey(data, field) {
+			t.Fatalf("Marshal output missing field %q: %s", field, data)
+		}
+	}
+}
+
+func containsKey(data []byte, key string) bool {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(data, &m); err != nil {
+		return false
+	}
+	_, ok := m[key]
+	return ok
 }

@@ -133,11 +133,36 @@ passes through it. The cost is that the smoothing is an approximation - it
 assumes requests were spread evenly through the previous window - rather
 than an exact count of the trailing interval.
 
+## Persisting state across restarts
+
+`TokenBucket` and `SlidingWindow` are plain structs with exported, json-tagged
+fields, so `encoding/json` round-trips them without any glue code:
+
+```go
+data, err := json.Marshal(bucket)
+// ... write data somewhere durable ...
+
+var restored ratelimit.TokenBucket
+err = json.Unmarshal(data, &restored)
+// restored is ready to pass to Allow or Refill as-is
+```
+
+For `KeyedLimiter`, `Snapshot` returns a copy of every tracked bucket keyed
+by tenant, and `Restore` loads a decoded snapshot back in:
+
+```go
+data, _ := json.Marshal(limiter.Snapshot())
+// ... write data somewhere durable ...
+
+var buckets map[string]ratelimit.TokenBucket
+json.Unmarshal(data, &buckets)
+limiter.Restore(buckets)
+```
+
 ## Status
 
-The token bucket, the sliding window, and the keyed multi-tenant limiter
-are complete and tested. Not yet covered: serialization helpers for
-persisting bucket state between process restarts.
+The token bucket, the sliding window, the keyed multi-tenant limiter, and
+JSON persistence for all three are complete and tested.
 
 ## License
 

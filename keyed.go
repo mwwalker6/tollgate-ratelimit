@@ -87,3 +87,32 @@ func (l *KeyedLimiter) Len() int {
 	defer l.mu.Unlock()
 	return len(l.buckets)
 }
+
+// Snapshot returns a copy of the buckets currently tracked, keyed the same
+// way Allow and AllowN are. Since TokenBucket marshals with encoding/json,
+// the result can be persisted directly and handed to Restore after a
+// process restart to pick up where the limiter left off.
+func (l *KeyedLimiter) Snapshot() map[string]TokenBucket {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	out := make(map[string]TokenBucket, len(l.buckets))
+	for k, v := range l.buckets {
+		out[k] = v
+	}
+	return out
+}
+
+// Restore replaces the limiter's buckets with buckets, typically a snapshot
+// produced by an earlier call to Snapshot and decoded after a restart.
+// Keys not present in buckets are dropped, matching a limiter that was
+// rebuilt from scratch and then loaded.
+func (l *KeyedLimiter) Restore(buckets map[string]TokenBucket) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.buckets = make(map[string]TokenBucket, len(buckets))
+	for k, v := range buckets {
+		l.buckets[k] = v
+	}
+}

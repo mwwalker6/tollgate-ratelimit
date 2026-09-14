@@ -16,13 +16,17 @@ import "time"
 // the smoothing is an approximation - it assumes requests are spread evenly
 // through the previous window - rather than an exact count of the trailing
 // interval.
+// Every field is exported and carries a json tag, so a SlidingWindow can be
+// persisted across a process restart with encoding/json the same way a
+// TokenBucket can. Window round-trips as nanoseconds, matching how
+// time.Duration already marshals elsewhere in the standard library.
 type SlidingWindow struct {
-	Limit  float64       // maximum requests allowed per Window
-	Window time.Duration // length of the window
+	Limit  float64       `json:"limit"`  // maximum requests allowed per Window
+	Window time.Duration `json:"window"` // length of the window
 
-	PrevCount float64   // requests counted in the previous window
-	CurrCount float64   // requests counted in the current window so far
-	CurrStart time.Time // start of the current window
+	PrevCount float64   `json:"prevCount"` // requests counted in the previous window
+	CurrCount float64   `json:"currCount"` // requests counted in the current window so far
+	CurrStart time.Time `json:"currStart"` // start of the current window
 }
 
 // NewSlidingWindow returns a window with nothing counted yet, so the first

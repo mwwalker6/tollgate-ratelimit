@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
@@ -147,5 +148,28 @@ func TestSlidingWindowRetryAfterPhaseTwo(t *testing.T) {
 	after := now.Add(d + time.Millisecond)
 	if _, ok := w.AllowN(after, 1); !ok {
 		t.Fatal("request for 1 should be allowed shortly after RetryAfter has elapsed")
+	}
+}
+
+func TestSlidingWindowJSONRoundTrip(t *testing.T) {
+	now := time.Now()
+	w := NewSlidingWindow(10, time.Second, now)
+	w, _ = w.AllowN(now, 7)
+
+	data, err := json.Marshal(w)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+
+	var got SlidingWindow
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if !got.CurrStart.Equal(w.CurrStart) {
+		t.Fatalf("CurrStart = %v, want %v", got.CurrStart, w.CurrStart)
+	}
+	got.CurrStart = w.CurrStart // time.Time round-trips to an equal instant, not an identical value
+	if got != w {
+		t.Fatalf("round-tripped window = %+v, want %+v", got, w)
 	}
 }

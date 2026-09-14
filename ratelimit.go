@@ -9,11 +9,16 @@ import "time"
 
 // TokenBucket is the state of a single rate limit. The zero value is not a
 // valid bucket; construct one with NewTokenBucket.
+//
+// Every field is exported and carries a json tag, so a TokenBucket can be
+// persisted across a process restart with encoding/json and handed straight
+// back to Allow or Refill once decoded - no separate serialization type is
+// needed.
 type TokenBucket struct {
-	Capacity   float64   // maximum number of tokens the bucket can hold
-	RefillRate float64   // tokens added per second
-	Tokens     float64   // tokens currently available
-	UpdatedAt  time.Time // last time the bucket was refilled
+	Capacity   float64   `json:"capacity"`   // maximum number of tokens the bucket can hold
+	RefillRate float64   `json:"refillRate"` // tokens added per second
+	Tokens     float64   `json:"tokens"`     // tokens currently available
+	UpdatedAt  time.Time `json:"updatedAt"`  // last time the bucket was refilled
 }
 
 // NewTokenBucket returns a bucket that starts full, so the first burst of
