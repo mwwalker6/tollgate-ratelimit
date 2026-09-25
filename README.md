@@ -162,7 +162,10 @@ limiter.Restore(buckets)
 ## Status
 
 The token bucket, the sliding window, the keyed multi-tenant limiter, and
-JSON persistence for all three are complete and tested.
+JSON persistence for all three are complete and tested. `go test -bench .`
+covers `AllowN` both bare and behind `KeyedLimiter`'s mutex, alone and under
+concurrent load, so a change to the locking strategy has something to be
+measured against.
 
 ## License
 
