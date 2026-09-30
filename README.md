@@ -159,6 +159,19 @@ json.Unmarshal(data, &buckets)
 limiter.Restore(buckets)
 ```
 
+## HTTP middleware example
+
+`examples/httpmiddleware` wraps a `KeyedLimiter` around an `http.Handler`,
+keyed by client IP, and answers 429 with a `Retry-After` header when a
+bucket is empty. It's meant to be copied and adjusted, not imported as a
+dependency.
+
+```go
+l := ratelimit.NewKeyedLimiter(20, 5)
+mw := httpmiddleware.New(l, httpmiddleware.RemoteIP, time.Now)
+http.ListenAndServe(":8080", mw(mux))
+```
+
 ## Status
 
 The token bucket, the sliding window, the keyed multi-tenant limiter, and
